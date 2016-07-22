@@ -1,0 +1,258 @@
+heat_template_version: 2013-05-23
+
+description: |
+  Linux server with [Docker](http://docker.io/) installed. This deployment is
+  intended for simple test cases and low traffic scenarios.
+
+  This template will only function with RackConnect v3.
+parameter_groups:
+
+- label: Server Settings
+  parameters:
+  - image
+  - flavor
+
+- label: Docker Settings
+  parameters:
+  - docker_image
+  # - docker_registry
+  - docker_tag
+  - docker_command_name
+  - docker_command_params
+  - docker_container_port
+  - docker_host_port
+
+- label: RackConnect Settings
+  parameters:
+  - rc_network_name
+
+- label: rax-dev-params
+  parameters:
+  - server_hostname
+  - kitchen
+  - chef_version
+
+parameters:
+
+  server_hostname:
+    label: Server Name
+    description: Server Name
+    type: string
+    default: docker
+    constraints:
+    - length:
+        min: 1
+        max: 64
+    - allowed_pattern: "^[a-zA-Z][a-zA-Z0-9-]*$"
+      description: |
+        Must begin with a letter and contain only alphanumeric characters.
+
+  image:
+    label: Operating System
+    description: |
+      Server image used for all servers that are created as a part of this
+      deployment.
+    type: string
+    default: Ubuntu 14.04 LTS (Trusty Tahr) (PV)
+    constraints:
+    - allowed_values:
+      - Debian 7 (Wheezy) (PVHVM)
+      - Ubuntu 12.04 LTS (Precise Pangolin) (PVHVM)
+      - Ubuntu 14.04 LTS (Trusty Tahr) (PV)
+      description: Must be a supported operating system.
+
+  flavor:
+    label: Server Size
+    description: |
+      Rackspace Cloud Server flavor to use. The size is based on the amount of
+      RAM for the provisioned server.
+    type: string
+    default: 2 GB General Purpose v1
+    constraints:
+    - allowed_values:
+      - 1 GB General Purpose v1
+      - 2 GB General Purpose v1
+      - 4 GB General Purpose v1
+      - 8 GB General Purpose v1
+      - 15 GB I/O v1
+      - 30 GB I/O v1
+      - 1GB Standard Instance
+      - 2GB Standard Instance
+      - 4GB Standard Instance
+      - 8GB Standard Instance
+      - 15GB Standard Instance
+      - 30GB Standard Instance
+      description: |
+        Must be a valid Rackspace Cloud Server flavor for the region you have
+        selected to deploy into.
+
+  docker_image:
+    label: Docker Image
+    description: Docker image to deploy.
+    type: string
+    default: busybox
+    constraints:
+      - length:
+          min: 1
+          max: 64
+      - allowed_pattern: |-
+          ^[a-zA-Z0-9-][a-zA-Z0-9-\/]*$
+        description: |
+          Must contain only alphanumeric characters except for '/'.
+
+  # docker_registry:
+  #   description: Docker registry from which to deploy.
+  #   type: string
+  #   default: ''
+  #   constraints:
+  #     - length:
+  #         min: 1
+  #         max: 64
+  #     - allowed_pattern: "^[a-zA-Z0-9-][a-zA-Z0-9-\/:\.@]*$"
+  #       description: |
+  #         Must contain only alphanumeric characters except for ':', '/', and '@'.
+
+  docker_tag:
+    label: Docker Tag
+    description: Docker image tag to deploy.
+    type: string
+    default: latest
+    constraints:
+      - length:
+          min: 1
+          max: 64
+      - allowed_pattern: |-
+          ^[a-zA-Z0-9-]*$
+        description: |
+          Must contain only alphanumeric characters.
+
+  docker_command_name:
+    label: Docker Command
+    description: Command to run in Docker container.
+    type: string
+    default: sleep
+    constraints:
+      - length:
+          min: 1
+          max: 64
+      - allowed_pattern: |-
+          ^[a-zA-Z0-9-\/\-\.]*$
+        description: |
+          Must contain only alphanumeric characters except for '/', '.', '-'.
+
+  docker_command_params:
+    label: Docker Arguments
+    description: Parameters to pass to command in Docker container.
+    type: string
+    default: '30'
+    constraints:
+      - length:
+          min: 1
+          max: 64
+      - allowed_pattern: |-
+          ^[a-zA-Z0-9-\/\-\.\:]*$
+        description: |
+          Must contain only alphanumeric characters except for '/', '.', '-', ':'.
+
+  # Needs to be an optional param when supported.
+  docker_container_port:
+    label: Docker Port
+    description: Port to expose on Docker container.
+    type: number
+    default: 8080
+    constraints:
+    - range:
+        min: 10
+        max: 65535
+      description: |
+        Port must be within the range of 10-65535.
+
+  docker_host_port:
+    label: Docker Host Port
+    description: Port to expose on Docker host.
+    type: number
+    default: 8080
+    constraints:
+    - range:
+        min: 10
+        max: 65535
+      description: |
+        Port must be within the range of 10-65535 and must not be 22.
+
+  kitchen:
+    label: Kitchen
+    description: "URL for a git repo containing required cookbooks"
+    type: string
+    default: https://github.com/rackspace-orchestration-templates/docker
+
+  chef_version:
+    label: Chef Version
+    description: Version of chef client to use
+    type: string
+    default: 11.16.4
+
+  rc_network_name:
+    type: string
+    label: RackConnect Network
+    description: Name or UUID of RackConnected network to attach this server to
+    constraints:
+    - custom_constraint: rackconnect.network
+    immutable: true
+resources:
+
+  ssh_key:
+    type: "OS::Nova::KeyPair"
+    properties:
+      name: { get_param: "OS::stack_id" }
+      save_private_key: true
+
+  docker_server:
+    type: "OS::Nova::Server"
+    properties:
+      name: { get_param: server_hostname }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      key_name: { get_resource: ssh_key }
+      networks:
+      - network: { get_param: rc_network_name }
+      - network: 11111111-1111-1111-1111-111111111111
+      metadata:
+        rax-heat: { get_param: "OS::stack_id" }
+
+  docker_setup:
+    type: "OS::Heat::ChefSolo"
+    depends_on: docker_server
+    properties:
+      username: root
+      private_key: { get_attr: [ssh_key, private_key] }
+      host: { get_attr: [docker_server, networks, private, 0] }
+      kitchen: { get_param: kitchen }
+      chef_version: { get_param: chef_version }
+      node:
+        rax-docker:
+          image: { get_param: docker_image }
+          # registry: { get_param: docker_registry }
+          tag: { get_param: docker_tag }
+          command:
+            name: { get_param: docker_command_name }
+            params: { get_param: docker_command_params }
+          container_port: { get_param: docker_container_port }
+          host_port: { get_param: docker_host_port }
+        run_list: ["recipe[rax-docker::setup]",
+                   "recipe[docker]",
+                   "recipe[rax-docker::default]"]
+
+  docker_server_public_ip:
+    type: Rackspace::RackConnect::PublicIP
+    depends_on:
+    - docker_server
+    properties:
+      server_id: { get_resource: docker_server }
+outputs:
+  private_key:
+    value: { get_attr: [ssh_key, private_key] }
+    description: "SSH Private Key"
+
+  server_ip:
+    value: { get_attr: [docker_server, accessIPv4] }
+    description: "Server IP"
