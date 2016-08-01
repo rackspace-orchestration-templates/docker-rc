@@ -1,6 +1,7 @@
 heat_template_version: 2013-05-23
 
 description: |
+  ###Single Linux server - RCv3
   Linux server with [Docker](http://docker.io/) installed. This deployment is
   intended for simple test cases and low traffic scenarios.
 
@@ -183,7 +184,7 @@ parameters:
     label: Kitchen
     description: "URL for a git repo containing required cookbooks"
     type: string
-    default: https://github.com/rackspace-orchestration-templates/docker
+    default: https://github.com/rackspace-orchestration-templates/docker-rc
 
   chef_version:
     label: Chef Version
