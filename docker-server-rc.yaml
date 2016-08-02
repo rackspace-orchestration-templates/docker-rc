@@ -1,7 +1,7 @@
 heat_template_version: 2013-05-23
 
 description: |
-  ###Single Linux server - RCv3
+  #### Single Linux server - RCv3
   Linux server with [Docker](http://docker.io/) installed. This deployment is
   intended for simple test cases and low traffic scenarios.
 
